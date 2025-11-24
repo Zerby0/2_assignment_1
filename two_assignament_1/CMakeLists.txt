@@ -14,10 +14,13 @@ find_package(nav2_msgs REQUIRED)
 find_package(apriltag_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED COMPONENTS core calib3d)
 
 add_executable(apriltag_manager_node src/apriltag_manager.cpp)
-ament_target_dependencies(apriltag_manager_node rclcpp apriltag_msgs sensor_msgs geometry_msgs tf2)
+
+ament_target_dependencies(apriltag_manager_node rclcpp apriltag_msgs sensor_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
 
 target_include_directories(apriltag_manager_node PRIVATE ${OpenCV_INCLUDE_DIRS})
 target_link_libraries(apriltag_manager_node ${OpenCV_LIBS})
