@@ -123,8 +123,8 @@ class ApriltagManagerNode : public rclcpp::Node {
         ODOM_FRAME.c_str(), target_ref_odom.pose.position.x, target_ref_odom.pose.position.y, target_ref_odom.pose.position.z);
     }
 
-    const std::string ODOM_FRAME = "/odom";
-    const std::string CAMERA_FRAME = "/external_camera/link/rgb_camera";
+    const std::string ODOM_FRAME = "odom";
+    const std::string CAMERA_FRAME = "external_camera/link/rgb_camera";
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
     
