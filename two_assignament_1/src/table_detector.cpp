@@ -82,10 +82,13 @@ private:
 
     void activation_callback(const std_msgs::msg::Bool::SharedPtr msg)
     {
-        if (msg->data && !is_active_) {
+        if (msg->data) {
             is_active_ = true;
-            tables_detected_ = false; // Reset per nuova detection
+            tables_detected_ = false; // Reset for new detection scan
             RCLCPP_INFO(this->get_logger(), "Start signal received! Scanning for circular tables...");
+        } else {
+            is_active_ = false;
+            RCLCPP_INFO(this->get_logger(), "Detection disabled");
         }
     }
 
