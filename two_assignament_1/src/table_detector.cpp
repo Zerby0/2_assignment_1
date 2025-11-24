@@ -48,7 +48,7 @@ public:
 
         // --- Subscribers ---
         activation_sub_ = this->create_subscription<std_msgs::msg::Bool>(
-            "/start_detection", 10, std::bind(&TableDetector::activation_callback, this, _1));
+            "/arrived", 10, std::bind(&TableDetector::activation_callback, this, _1));
 
         scan_sub_ = this->create_subscription<sensor_msgs::msg::LaserScan>(
             "/scan", 10, std::bind(&TableDetector::scan_callback, this, _1));
