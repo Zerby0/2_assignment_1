@@ -1,31 +1,28 @@
-#include <chrono>
-#include <memory>
 #include <string>
-#include <vector>
-#include <sstream>
-
 #include <opencv2/core.hpp> 
 #include <opencv2/core/types.hpp>
 #include <opencv2/calib3d.hpp> 
-
 #include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
 #include "apriltag_msgs/msg/april_tag_detection_array.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "tf2/exceptions.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 
 using namespace std::chrono_literals;
 
 class ApriltagManagerNode : public rclcpp::Node {
   public:
     ApriltagManagerNode(): Node("apriltag_manager"){
+      tf_buffer_ = std::make_shared<tf2_ros::Buffer>(this->get_clock());
+      tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+
       cameraInfoSub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
         "/rgb_camera/camera_info", 3,
         std::bind(&ApriltagManagerNode::on_camera_info_received, this, std::placeholders::_1)
-      );
-      odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
-        "/odom", 3,
-        std::bind(&ApriltagManagerNode::on_odom_received, this, std::placeholders::_1)
-      };    
+      );   
       detectionsSub_ = this->create_subscription<apriltag_msgs::msg::AprilTagDetectionArray>(
         "apriltag/detections", 3,
         std::bind(&ApriltagManagerNode::on_detection_received, this, std::placeholders::_1)
@@ -49,11 +46,6 @@ class ApriltagManagerNode : public rclcpp::Node {
       camera_info_fetched_ = true;
       cameraInfoSub_.reset(); // To avoid unuseful reassignment of the same values
     }  
-
-    void on_odom_received(const nav_msgs::msg::Odometry::SharedPtr msg){
-      start_odom_ = *msg;
-      odom_sub_.reset(); // To avoid unuseful reassignment of the same values
-    }
 
     void on_detection_received(const apriltag_msgs::msg::AprilTagDetectionArray::SharedPtr msg) {
       if (! camera_info_fetched_) {
@@ -103,29 +95,41 @@ class ApriltagManagerNode : public rclcpp::Node {
       avg_t[0] /= msg->detections.size();
       avg_t[1] /= msg->detections.size();
       avg_t[2] /= msg->detections.size();
-
-      /* devo ancora trasformare avg_t dalla camera al mondo usando start_odom_
       
-      geometry_msgs::msg::PoseStamped target_msg;
-      target_msg.header.stamp = this->now();
-      target_msg.pose.position.x = avg_t[0];
-      target_msg.pose.position.y = avg_t[1];
-      target_msg.pose.position.z = avg_t[2];
-      target_msg.pose.orientation.x = 0.0;
-      target_msg.pose.orientation.y = 0.0;
-      target_msg.pose.orientation.z = 0.0;
-      target_msg.pose.orientation.w = 0.0;
-      
-      target_pub_->publish(target_msg);
+      geometry_msgs::msg::PoseStamped target_ref_camera;
+      target_ref_camera.header.frame_id = CAMERA_FRAME;
+      target_ref_camera.header.stamp = this->now();
+      target_ref_camera.pose.position.x = avg_t[0];
+      target_ref_camera.pose.position.y = avg_t[1];
+      target_ref_camera.pose.position.z = avg_t[2];
+      target_ref_camera.pose.orientation.x = 0.0;
+      target_ref_camera.pose.orientation.y = 0.0;
+      target_ref_camera.pose.orientation.z = 0.0;
+      target_ref_camera.pose.orientation.w = 1.0;
 
-      RCLCPP_INFO(this->get_logger(), "Published target pose: x=%.3f y=%.3f z=%.3f", 
-        avg_t[0], avg_t[1], avg_t[2]);*/
+      geometry_msgs::msg::PoseStamped target_ref_odom;
+      try {
+        geometry_msgs::msg::TransformStamped tf_camera_odom = 
+          tf_buffer_->lookupTransform(ODOM_FRAME, CAMERA_FRAME, tf2::TimePointZero);        
+        tf2::doTransform(target_ref_camera, target_ref_odom, tf_camera_odom);
+      }
+      catch (const tf2::TransformException & ex) {
+        RCLCPP_WARN(this->get_logger(), "Could not transform target from camera to odom: %s", ex.what());
+        return;
+      }
+
+      target_pub_->publish(target_ref_odom);
+      RCLCPP_INFO(this->get_logger(), "Published target pose in %s: x=%.3f y=%.3f z=%.3f", 
+        ODOM_FRAME.c_str(), target_ref_odom.pose.position.x, target_ref_odom.pose.position.y, target_ref_odom.pose.position.z);
     }
 
+    const std::string ODOM_FRAME = "odom";
+    const std::string CAMERA_FRAME = "external_camera/link/rgb_camera";
+    std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    
     bool camera_info_fetched_ = false;
-    nav_msgs::msg::Odometry start_odom_ = nullptr;
     rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr cameraInfoSub_;
-    rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<apriltag_msgs::msg::AprilTagDetectionArray>::SharedPtr detectionsSub_;
 
     cv::Mat camera_matrix_;
