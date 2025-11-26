@@ -63,7 +63,7 @@ private:
       return;
     }
 
-    if (!action_client_->wait_for_action_server(5s)) {
+    if (!action_client_->wait_for_action_server()) {
       RCLCPP_WARN(this->get_logger(), "Navigate action server not available");
       return;
     }
