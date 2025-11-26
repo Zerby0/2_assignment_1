@@ -128,6 +128,12 @@ class ApriltagManagerNode : public rclcpp::Node {
         RCLCPP_WARN(this->get_logger(), "Could not get odom-map transform for keeping the same Z: %s", ex.what());
       }
 
+      //we don't care about orientation for the target
+      target_ref_map.pose.orientation.x = 0.0;
+      target_ref_map.pose.orientation.y = 0.0;
+      target_ref_map.pose.orientation.z = 0.0;
+      target_ref_map.pose.orientation.w = 1.0;
+
       target_pub_->publish(target_ref_map);
       RCLCPP_INFO(this->get_logger(), "Published target pose from map: x=%.3f y=%.3f z=%.3f", 
         target_ref_map.pose.position.x, target_ref_map.pose.position.y, target_ref_map.pose.position.z);

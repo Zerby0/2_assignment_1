@@ -1,0 +1,14 @@
+<launch>
+  <include file="$(find-pkg-share apriltag_ros)/launch/apriltag_gazebo.launch.yml"/>
+
+  <node pkg="tf2_ros"
+        exec="static_transform_publisher"
+        args="0 0 0 0 0 0 map odom"/>
+
+ <include file="$(find-pkg-share nav2_bringup)/launch/bringup_launch.py"/>
+
+  <node pkg="two_assignment_1" exec="apriltag_manager_node"/>
+  <node pkg="two_assignment_1" exec="driver_node"/>
+  <node pkg="two_assignment_1" exec="table_detector_node"/>
+
+</launch>
