@@ -1,2 +1,5 @@
 ir_2526/
 *.vscode*
+build/
+install/
+log/
