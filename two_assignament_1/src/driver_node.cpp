@@ -81,7 +81,14 @@ private:
     send_goal_options.goal_response_callback = [this](rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle) {
       goal_handle_ = goal_handle;
       if (!goal_handle_) {
+        // log rich info to help debugging why the goal was rejected
         RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
+        const auto & g = last_sent_goal_;
+        RCLCPP_ERROR(this->get_logger(), "Rejected goal details: frame='%s' pos=(%.3f, %.3f, %.3f) quat=(%.3f, %.3f, %.3f, %.3f)",
+                    g.header.frame_id.c_str(),
+                    g.pose.position.x, g.pose.position.y, g.pose.position.z,
+                    g.pose.orientation.x, g.pose.orientation.y, g.pose.orientation.z, g.pose.orientation.w);
+        RCLCPP_ERROR(this->get_logger(), "Check Nav2 logs and frame/TF configuration (global_frame vs goal header)");
         navigating_ = false;
       } else {
         RCLCPP_INFO(this->get_logger(), "Goal accepted by server, navigating...");
@@ -124,6 +131,10 @@ private:
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr action_client_;
   rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr goal_handle_;
   bool navigating_ = false;
+
+  // store last sent goal for debugging when a goal is rejected
+  geometry_msgs::msg::PoseStamped last_sent_goal_;
+
 
   double initial_x_;
   double initial_y_;
