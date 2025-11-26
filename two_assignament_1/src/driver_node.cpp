@@ -121,6 +121,7 @@ private:
       goal_handle_.reset();
     };
 
+    last_sent_goal_ = goal_msg.pose;
     action_client_->async_send_goal(goal_msg, send_goal_options);
   }
 
