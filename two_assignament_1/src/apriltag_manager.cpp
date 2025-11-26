@@ -107,23 +107,23 @@ class ApriltagManagerNode : public rclcpp::Node {
       target_ref_camera.pose.orientation.z = 0.0;
       target_ref_camera.pose.orientation.w = 1.0;
 
-      geometry_msgs::msg::PoseStamped target_ref_odom;
+      geometry_msgs::msg::PoseStamped target_ref_map;
       try {
-        geometry_msgs::msg::TransformStamped tf_camera_odom = 
-          tf_buffer_->lookupTransform(ODOM_FRAME, CAMERA_FRAME, tf2::TimePointZero);        
-        tf2::doTransform(target_ref_camera, target_ref_odom, tf_camera_odom);
+        geometry_msgs::msg::TransformStamped tf_camera_map = 
+          tf_buffer_->lookupTransform(MAP_FRAME, CAMERA_FRAME, tf2::TimePointZero);        
+        tf2::doTransform(target_ref_camera, target_ref_map, tf_camera_map);
       }
       catch (const tf2::TransformException & ex) {
-        RCLCPP_WARN(this->get_logger(), "Could not transform target from camera to odom: %s", ex.what());
+        RCLCPP_WARN(this->get_logger(), "Could not transform target from camera to map: %s", ex.what());
         return;
       }
 
-      target_pub_->publish(target_ref_odom);
-      RCLCPP_INFO(this->get_logger(), "Published target pose in %s: x=%.3f y=%.3f z=%.3f", 
-        ODOM_FRAME.c_str(), target_ref_odom.pose.position.x, target_ref_odom.pose.position.y, target_ref_odom.pose.position.z);
+      target_pub_->publish(target_ref_map);
+      RCLCPP_INFO(this->get_logger(), "Published target pose from map: x=%.3f y=%.3f z=%.3f", 
+        target_ref_map.pose.position.x, target_ref_map.pose.position.y, target_ref_map.pose.position.z);
     }
 
-    const std::string ODOM_FRAME = "odom";
+    const std::string MAP_FRAME = "map";
     const std::string CAMERA_FRAME = "external_camera/link/rgb_camera";
     std::shared_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
