@@ -42,3 +42,15 @@ install(TARGETS
 target_include_directories(driver_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
+
+
+add_executable(table_detector_node src/table_detector.cpp)
+ament_target_dependencies(table_detector_node rclcpp sensor_msgs std_msgs geometry_msgs tf2 tf2_ros tf2_geometry_msgs)
+install(TARGETS
+  table_detector_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY launch
+  DESTINATION share/${PROJECT_NAME}
+)
