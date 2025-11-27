@@ -3,7 +3,6 @@
 #include <functional>
 #include <string>
 #include <cmath>
-#include <algorithm>
 
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
@@ -11,6 +10,7 @@
 #include "geometry_msgs/msg/pose_with_covariance_stamped.hpp"
 #include "std_msgs/msg/bool.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "nav2_msgs/srv/manage_lifecycle_nodes.hpp"
 
 static constexpr char INPUT_TOPIC[] = "target";
 static constexpr char ARRIVED_TOPIC[] = "arrived";
@@ -41,6 +41,15 @@ public:
 
     action_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
 
+    // Create service clients for lifecycle management
+    localization_client_ = this->create_client<nav2_msgs::srv::ManageLifecycleNodes>(
+      "/lifecycle_manager_localization/manage_nodes");
+    navigation_client_ = this->create_client<nav2_msgs::srv::ManageLifecycleNodes>(
+      "/lifecycle_manager_navigation/manage_nodes");
+
+    // Wait for services and activate Nav2 nodes
+    startup_nav2();
+
     geometry_msgs::msg::PoseWithCovarianceStamped init;
     init.header.stamp = this->now();
     init.header.frame_id = initial_frame_id_;
@@ -56,6 +65,67 @@ public:
   }
 
 private:
+  void startup_nav2()
+  {
+    RCLCPP_INFO(this->get_logger(), "Waiting for lifecycle management services...");
+    
+    // Wait for localization service
+    while (!localization_client_->wait_for_service(1s)) {
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for localization service");
+        return;
+      }
+      RCLCPP_INFO(this->get_logger(), "Waiting for /lifecycle_manager_localization/manage_nodes service...");
+    }
+
+    // Wait for navigation service
+    while (!navigation_client_->wait_for_service(1s)) {
+      if (!rclcpp::ok()) {
+        RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for navigation service");
+        return;
+      }
+      RCLCPP_INFO(this->get_logger(), "Waiting for /lifecycle_manager_navigation/manage_nodes service...");
+    }
+
+    RCLCPP_INFO(this->get_logger(), "Lifecycle management services available");
+
+    // Startup localization nodes
+    auto localization_request = std::make_shared<nav2_msgs::srv::ManageLifecycleNodes::Request>();
+    localization_request->command = nav2_msgs::srv::ManageLifecycleNodes::Request::STARTUP;
+    
+    auto localization_future = localization_client_->async_send_request(localization_request);
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), localization_future) ==
+        rclcpp::FutureReturnCode::SUCCESS)
+    {
+      auto result = localization_future.get();
+      if (result->success) {
+        RCLCPP_INFO(this->get_logger(), "Localization nodes started successfully");
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to start localization nodes");
+      }
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Failed to call localization service");
+    }
+
+    // Startup navigation nodes
+    auto navigation_request = std::make_shared<nav2_msgs::srv::ManageLifecycleNodes::Request>();
+    navigation_request->command = nav2_msgs::srv::ManageLifecycleNodes::Request::STARTUP;
+    
+    auto navigation_future = navigation_client_->async_send_request(navigation_request);
+    if (rclcpp::spin_until_future_complete(this->get_node_base_interface(), navigation_future) ==
+        rclcpp::FutureReturnCode::SUCCESS)
+    {
+      auto result = navigation_future.get();
+      if (result->success) {
+        RCLCPP_INFO(this->get_logger(), "Navigation nodes started successfully");
+      } else {
+        RCLCPP_ERROR(this->get_logger(), "Failed to start navigation nodes");
+      }
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Failed to call navigation service");
+    }
+  }
+
   void target_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
   {
     if (navigating_) {
@@ -67,45 +137,30 @@ private:
       RCLCPP_WARN(this->get_logger(), "Navigate action server not available");
       return;
     }
-    geometry_msgs::msg::PoseStamped incoming = *msg;
     auto goal_msg = NavigateToPose::Goal();
-    goal_msg.pose = incoming;
-    initial_distance_ = 0.0;
-    RCLCPP_INFO(this->get_logger(), "Forwarding incoming pose in frame '%s' directly to Nav2",
-                incoming.header.frame_id.c_str());
+    goal_msg.pose = *msg;
+    RCLCPP_INFO(this->get_logger(), "Sending navigation goal in frame '%s'",
+                msg->header.frame_id.c_str());
 
     navigating_ = true;
 
     auto send_goal_options = rclcpp_action::Client<NavigateToPose>::SendGoalOptions();
 
     send_goal_options.goal_response_callback = [this](rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr goal_handle) {
-      goal_handle_ = goal_handle;
-      if (!goal_handle_) {
-        // log rich info to help debugging why the goal was rejected
+      if (!goal_handle) {
         RCLCPP_ERROR(this->get_logger(), "Goal was rejected by server");
-        const auto & g = last_sent_goal_;
-        RCLCPP_ERROR(this->get_logger(), "Rejected goal details: frame='%s' pos=(%.3f, %.3f, %.3f) quat=(%.3f, %.3f, %.3f, %.3f)",
-                    g.header.frame_id.c_str(),
-                    g.pose.position.x, g.pose.position.y, g.pose.position.z,
-                    g.pose.orientation.x, g.pose.orientation.y, g.pose.orientation.z, g.pose.orientation.w);
-        RCLCPP_ERROR(this->get_logger(), "Check Nav2 logs and frame/TF configuration (global_frame vs goal header)");
         navigating_ = false;
       } else {
-        RCLCPP_INFO(this->get_logger(), "Goal accepted by server, navigating...");
+        RCLCPP_INFO(this->get_logger(), "Goal accepted, navigating...");
       }
     };
 
     send_goal_options.feedback_callback = [this](
       rclcpp_action::ClientGoalHandle<NavigateToPose>::SharedPtr,
       const std::shared_ptr<const NavigateToPose::Feedback> feedback) {
-      if (!feedback) return;
-      double remaining = feedback->distance_remaining;
-      double percent = 0.0;
-      if (initial_distance_ > 0.0) {
-        percent = 100.0 * (1.0 - (remaining / initial_distance_));
-        percent = std::max(0.0, std::min(100.0, percent));
+      if (feedback) {
+        RCLCPP_INFO(this->get_logger(), "Distance remaining: %.2f m", feedback->distance_remaining);
       }
-      RCLCPP_INFO(this->get_logger(), "Navigation feedback: remaining=%.3f m, progress=%.1f%%", remaining, percent);
     };
 
     send_goal_options.result_callback = [this](const rclcpp_action::ClientGoalHandle<NavigateToPose>::WrappedResult & result) {
@@ -118,10 +173,8 @@ private:
         RCLCPP_WARN(this->get_logger(), "Navigation failed or canceled — not publishing arrived=true");
       }
       navigating_ = false;
-      goal_handle_.reset();
     };
 
-    last_sent_goal_ = goal_msg.pose;
     action_client_->async_send_goal(goal_msg, send_goal_options);
   }
 
@@ -130,18 +183,15 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::PoseWithCovarianceStamped>::SharedPtr initialpose_pub_;
 
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr action_client_;
-  rclcpp_action::ClientGoalHandle<nav2_msgs::action::NavigateToPose>::SharedPtr goal_handle_;
   bool navigating_ = false;
 
-  // store last sent goal for debugging when a goal is rejected
-  geometry_msgs::msg::PoseStamped last_sent_goal_;
-
+  rclcpp::Client<nav2_msgs::srv::ManageLifecycleNodes>::SharedPtr localization_client_;
+  rclcpp::Client<nav2_msgs::srv::ManageLifecycleNodes>::SharedPtr navigation_client_;
 
   double initial_x_;
   double initial_y_;
   double initial_yaw_;
   std::string initial_frame_id_;
-  double initial_distance_ = 0.0;
 };
 
 }
