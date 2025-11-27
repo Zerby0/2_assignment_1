@@ -13,17 +13,13 @@ def find_workspace_root():
     """Find the ROS2 workspace root by looking for 'src' and 'install' directories."""
     current = Path.cwd()
     
-    # Check current directory
     if (current / 'src').exists() and (current / 'install').exists():
         return current
     
-    # Check parent directories
     for parent in current.parents:
         if (parent / 'src').exists() and (parent / 'install').exists():
             return parent
     
-    # Default fallback - assume we're in a subdirectory
-    # Try common patterns
     if 'ws_2_assignments' in str(current):
         parts = str(current).split('ws_2_assignments')
         ws_path = parts[0] + 'ws_2_assignments'
@@ -40,16 +36,11 @@ def open_terminal_with_command(workspace_path, command, title):
     """
     workspace_str = str(workspace_path)
     
-    # Full command: change directory, source setup, then run the command
     full_cmd = f"cd {workspace_str} && source install/setup.bash && {command}"
     
-    # Try different terminal emulators
     terminal_commands = [
-        # GNOME Terminal (Ubuntu default)
         ['gnome-terminal', '--title', title, '--', 'bash', '-c', f'{full_cmd}; exec bash'],
-        # Konsole (KDE)
         ['konsole', '--title', title, '-e', 'bash', '-c', f'{full_cmd}; exec bash'],
-        # xterm (fallback)
         ['xterm', '-T', title, '-e', f'bash -c "{full_cmd}; exec bash"'],
     ]
     
@@ -67,11 +58,9 @@ def open_terminal_with_command(workspace_path, command, title):
 def main():
     print("=== ROS2 Assignment Launcher ===\n")
     
-    # Find workspace
     workspace = find_workspace_root()
     print(f"Workspace found: {workspace}\n")
     
-    # Define commands to run
     commands = [
         {
             'title': '1-AprilTag Gazebo',
