@@ -98,7 +98,7 @@ class ApriltagManagerNode : public rclcpp::Node {
       
       geometry_msgs::msg::PoseStamped target_ref_camera;
       target_ref_camera.header.frame_id = CAMERA_FRAME;
-      target_ref_camera.header.stamp = msg->header.stamp;
+      target_ref_camera.header.stamp = this->now();
       target_ref_camera.pose.position.x = avg_t[0];
       target_ref_camera.pose.position.y = avg_t[1];
       target_ref_camera.pose.position.z = avg_t[2];
@@ -128,6 +128,9 @@ class ApriltagManagerNode : public rclcpp::Node {
         RCLCPP_WARN(this->get_logger(), "Could not get odom-map transform for keeping the same Z: %s", ex.what());
       }
 
+      
+      target_ref_map.pose.position.x += X_OFFSET;
+      target_ref_map.pose.position.y += Y_OFFSET;
       //we don't care about orientation for the target
       target_ref_map.pose.orientation.x = 0.0;
       target_ref_map.pose.orientation.y = 0.0;
@@ -153,6 +156,8 @@ class ApriltagManagerNode : public rclcpp::Node {
     cv::Mat dist_coeffs_;
     const double TAG_SIZE = 0.05;
 
+    const double X_OFFSET = - 0.7;
+    const double Y_OFFSET = + 0.4;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr target_pub_;
 };
 
