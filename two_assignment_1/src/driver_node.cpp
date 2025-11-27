@@ -49,19 +49,6 @@ public:
 
     //wait services and activate Nav2 nodes
     startup_nav2();
-
-    geometry_msgs::msg::PoseWithCovarianceStamped init;
-    init.header.stamp = this->now();
-    init.header.frame_id = initial_frame_id_;
-    init.pose.pose.position.x = initial_x_;
-    init.pose.pose.position.y = initial_y_;
-    init.pose.pose.position.z = 0.0;
-    double cy = std::cos(initial_yaw_ * 0.5);
-    double sy = std::sin(initial_yaw_ * 0.5);
-    init.pose.pose.orientation.z = sy;
-    init.pose.pose.orientation.w = cy;
-    initialpose_pub_->publish(init);
-    RCLCPP_INFO(this->get_logger(), "Published initial pose: x=%.2f y=%.2f yaw=%.2f", initial_x_, initial_y_, initial_yaw_);
   }
 
 private:
@@ -124,17 +111,36 @@ private:
     } else {
       RCLCPP_ERROR(this->get_logger(), "Failed to call navigation service");
     }
+
+    // Give Nav2 nodes time to fully activate
+    RCLCPP_INFO(this->get_logger(), "Waiting for Nav2 nodes to be ready...");
+    rclcpp::sleep_for(std::chrono::seconds(3));
+    RCLCPP_INFO(this->get_logger(), "Nav2 nodes ready");
+
+    // Now publish initial pose after AMCL is ready
+    geometry_msgs::msg::PoseWithCovarianceStamped init;
+    init.header.stamp = this->now();
+    init.header.frame_id = initial_frame_id_;
+    init.pose.pose.position.x = initial_x_;
+    init.pose.pose.position.y = initial_y_;
+    init.pose.pose.position.z = 0.0;
+    double cy = std::cos(initial_yaw_ * 0.5);
+    double sy = std::sin(initial_yaw_ * 0.5);
+    init.pose.pose.orientation.z = sy;
+    init.pose.pose.orientation.w = cy;
+    initialpose_pub_->publish(init);
+    RCLCPP_INFO(this->get_logger(), "Published initial pose: x=%.2f y=%.2f yaw=%.2f", initial_x_, initial_y_, initial_yaw_);
   }
 
   void target_callback(const geometry_msgs::msg::PoseStamped::SharedPtr msg)
   {
     if (navigating_) {
-      RCLCPP_INFO(this->get_logger(), "Already navigating: ignoring new request");
+      RCLCPP_WARN(this->get_logger(), "Already navigating: ignoring new request");
       return;
     }
 
-    if (!action_client_->wait_for_action_server()) {
-      RCLCPP_WARN(this->get_logger(), "Navigate action server not available");
+    if (!action_client_->wait_for_action_server(1s)) {
+      RCLCPP_WARN(this->get_logger(), "Navigate action server not available, ignoring goal");
       return;
     }
     auto goal_msg = NavigateToPose::Goal();

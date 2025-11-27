@@ -98,7 +98,7 @@ class ApriltagManagerNode : public rclcpp::Node {
       
       geometry_msgs::msg::PoseStamped target_ref_camera;
       target_ref_camera.header.frame_id = CAMERA_FRAME;
-      target_ref_camera.header.stamp = this->now();
+      target_ref_camera.header.stamp = msg->header.stamp;
       target_ref_camera.pose.position.x = avg_t[0];
       target_ref_camera.pose.position.y = avg_t[1];
       target_ref_camera.pose.position.z = avg_t[2];
