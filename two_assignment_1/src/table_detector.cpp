@@ -39,12 +39,12 @@ public:
     {
         // --- Parametri ---
         cluster_tolerance_ = 0.30;  // Distanza max tra punti per unirli (m)
-        min_cluster_size_ = 5;      // Minimo punti per considerare un oggetto (filtra rumore)
+        min_cluster_size_ = 3;      // Minimo punti per considerare un oggetto (filtra rumore)
         max_cluster_size_ = 90;     // Massimo punti: IMPORTANTE per filtrare i MURI
         
         // Raggio atteso del tavolo (filtro geometrico)
-        min_table_radius_ = 0.15;   
-        max_table_radius_ = 0.45;   
+        min_table_radius_ = 0.10;   
+        max_table_radius_ = 0.60;   
 
         // --- Subscribers ---
         activation_sub_ = this->create_subscription<std_msgs::msg::Bool>(
