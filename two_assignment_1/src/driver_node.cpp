@@ -41,13 +41,11 @@ public:
 
     action_client_ = rclcpp_action::create_client<NavigateToPose>(this, "navigate_to_pose");
 
-    //service clients for lifecycle management
     localization_client_ = this->create_client<nav2_msgs::srv::ManageLifecycleNodes>(
       "/lifecycle_manager_localization/manage_nodes");
     navigation_client_ = this->create_client<nav2_msgs::srv::ManageLifecycleNodes>(
       "/lifecycle_manager_navigation/manage_nodes");
 
-    //wait services and activate Nav2 nodes
     startup_nav2();
   }
 
@@ -56,7 +54,6 @@ private:
   {
     RCLCPP_INFO(this->get_logger(), "Waiting for lifecycle management services...");
     
-    //wait for localization service
     while (!localization_client_->wait_for_service(1s)) {
       if (!rclcpp::ok()) {
         RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for localization service");
@@ -65,7 +62,6 @@ private:
       RCLCPP_INFO(this->get_logger(), "Waiting for /lifecycle_manager_localization/manage_nodes service...");
     }
 
-    //wait for navigation service
     while (!navigation_client_->wait_for_service(1s)) {
       if (!rclcpp::ok()) {
         RCLCPP_ERROR(this->get_logger(), "Interrupted while waiting for navigation service");
@@ -76,7 +72,6 @@ private:
 
     RCLCPP_INFO(this->get_logger(), "Lifecycle management services available");
 
-    //startup localization nodes
     auto localization_request = std::make_shared<nav2_msgs::srv::ManageLifecycleNodes::Request>();
     localization_request->command = nav2_msgs::srv::ManageLifecycleNodes::Request::STARTUP;
     
@@ -94,7 +89,6 @@ private:
       RCLCPP_ERROR(this->get_logger(), "Failed to call localization service");
     }
 
-    //startup navigation nodes
     auto navigation_request = std::make_shared<nav2_msgs::srv::ManageLifecycleNodes::Request>();
     navigation_request->command = nav2_msgs::srv::ManageLifecycleNodes::Request::STARTUP;
     
@@ -112,12 +106,10 @@ private:
       RCLCPP_ERROR(this->get_logger(), "Failed to call navigation service");
     }
 
-    // Give Nav2 nodes time to fully activate
     RCLCPP_INFO(this->get_logger(), "Waiting for Nav2 nodes to be ready...");
     rclcpp::sleep_for(std::chrono::seconds(3));
     RCLCPP_INFO(this->get_logger(), "Nav2 nodes ready");
 
-    // Now publish initial pose after AMCL is ready
     geometry_msgs::msg::PoseWithCovarianceStamped init;
     init.header.stamp = this->now();
     init.header.frame_id = initial_frame_id_;
